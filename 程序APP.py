@@ -47,8 +47,8 @@ features = np.array([feature_values])
 # 预测与 SHAP 可视化
 if st.button("Predict"):
     # 模型预测
-    predicted_class = model.predict(features)[1]
-    predicted_proba = model.predict_proba(features)[1]
+    predicted_class = model.predict(features)[0]
+    predicted_proba = model.predict_proba(features)[0]
 
     # 提取预测的类别概率
     probability = predicted_proba[predicted_class] * 100
