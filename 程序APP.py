@@ -3,7 +3,7 @@ import joblib
 import numpy as np
 import pandas as pd
 import shap
-import tempfile
+import matplotlib.pyplot as plt
 import os
 
 # 加载保存的随机森林模型
@@ -35,6 +35,11 @@ for feature, properties in feature_ranges.items():
             max_value=float(properties["max"]),
             value=float(properties["default"]),
         )
+    elif properties["type"] == "categorical":
+        value = st.selectbox(
+            label=f"{feature} (Select a value)",
+            options=properties["options"],
+        )
     feature_values.append(value)
 
 # 转换为模型输入格式
@@ -45,31 +50,49 @@ if st.button("Predict"):
     # 模型预测
     predicted_class = model.predict(features)[0]
     predicted_proba = model.predict_proba(features)[0]
+    # 提取预测的类别概率
     probability = predicted_proba[predicted_class] * 100
 
-    # 明确显示预测结果
+    # 明确显示预测结果，使用 Matplotlib 渲染指定字体
     if predicted_class == 1:
-        result_text = f"Predicted possibility of having sepsis: {probability:.2f}%"
+        text = f"Predicted possibility of having sepsis: {probability:.2f}%"
+        fig, ax = plt.subplots(figsize=(8, 1))
+        ax.text(
+            0.5, 0.5, text,
+            fontsize=16,
+            ha='center', va='center',
+            fontname='Times New Roman',
+            transform=ax.transAxes
+        )
+        ax.axis('off')
+        plt.savefig("prediction_text.png", bbox_inches='tight', dpi=300)
+        st.image("prediction_text.png")
     else:
-        result_text = f"Predicted possibility of not having sepsis: {probability:.2f}%"
-    st.write(result_text)
+        text = f"Predicted possibility of not having sepsis: {probability:.2f}%"
+        fig, ax = plt.subplots(figsize=(8, 1))
+        ax.text(
+            0.5, 0.5, text,
+            fontsize=16,
+            ha='center', va='center',
+            fontname='Times New Roman',
+            transform=ax.transAxes
+        )
+        ax.axis('off')
+        plt.savefig("prediction_text.png", bbox_inches='tight', dpi=300)
+        st.image("prediction_text.png")
 
     # 计算 SHAP 值
-    explainer = shap.Explainer(model)
-    shap_values = explainer(pd.DataFrame(features, columns=feature_ranges.keys()))
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(pd.DataFrame([feature_values], columns=feature_ranges.keys()))
 
-    # 使用 SHAP 力图（HTML 交互版）
-    html_output = shap.plots.force(
-        explainer.expected_value,
-        shap_values.values[0],
-        pd.DataFrame(features, columns=feature_ranges.keys()).iloc[0],
-        show=False,
-        matplotlib=False,
+    # 生成 SHAP 力图
+    class_index = predicted_class  # 当前预测类别
+    shap_fig = shap.force_plot(
+        explainer.expected_value[class_index],
+        shap_values[:, :, class_index],
+        pd.DataFrame([feature_values], columns=feature_ranges.keys()),
+        matplotlib=True,
     )
-    shap_html = f"<head>{shap.getjs()}</head><body>{html_output.html()}</body>"
-    st.components.v1.html(shap_html, height=300)
-
-    # 清理临时文件
-    for file in os.listdir(tempfile.gettempdir()):
-        if file.startswith("shap_force_plot"):
-            os.remove(os.path.join(tempfile.gettempdir(), file))
+    # 保存并显示 SHAP 图
+    plt.savefig("shap_force_plot.png", bbox_inches='tight', dpi=1200)
+    st.image("shap_force_plot.png")
